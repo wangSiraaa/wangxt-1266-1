@@ -1,0 +1,78 @@
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.page-container {
+  padding: 24px;
+}
+
+.card-wrapper {
+  background: #fff;
+  border-radius: 4px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  text-align: center;
+  padding: 20px;
+}
+
+.stat-number {
+  font-size: 32px;
+  font-weight: 600;
+  margin: 8px 0;
+}
+
+.stat-label {
+  color: #86909c;
+  font-size: 14px;
+}
+
+.login-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.login-card {
+  width: 420px;
+  padding: 40px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.login-title {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-title h1 {
+  margin: 0 0 8px 0;
+  color: #1d2129;
+  font-size: 24px;
+}
+
+.login-title p {
+  margin: 0;
+  color: #86909c;
+  font-size: 14px;
+}
+
+.detail-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 16px 0 12px 0;
+  padding-left: 10px;
+  border-left: 3px solid #165dff;
+}
