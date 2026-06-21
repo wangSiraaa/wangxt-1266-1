@@ -30,8 +30,7 @@ public class DashboardService {
         long frozenInvoices = invoiceRepository.countByStatus(InvoiceStatusEnum.FROZEN);
 
         long totalSuppliers = supplierRepository.count();
-        long blacklistedSuppliers = supplierRepository.count();
-        blacklistedSuppliers = supplierRepository.findByConditions(null, true, org.springframework.data.domain.Pageable.unpaged())
+        long blacklistedSuppliers = supplierRepository.findByConditions(null, true, org.springframework.data.domain.Pageable.unpaged())
                 .getTotalElements();
 
         long pendingRisks = riskRecordRepository.countByIsResolvedFalse();
