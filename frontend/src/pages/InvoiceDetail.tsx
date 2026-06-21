@@ -17,6 +17,9 @@ import {
   Timeline,
   Switch as ArcoSwitch,
   Grid,
+  Checkbox,
+  Popconfirm,
+  Empty,
 } from '@arco-design/web-react'
 import {
   IconArrowLeft,
@@ -26,6 +29,8 @@ import {
   IconClose,
   IconUser,
   IconCalendar,
+  IconDelete,
+  IconUpload,
 } from '@arco-design/web-react/icon'
 import { useNavigate, useParams } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -38,10 +43,13 @@ import { useAuth } from '@/store/AuthContext'
 import {
   RISK_TYPE_OPTIONS,
   MATERIAL_TYPE_OPTIONS,
+  MATERIAL_STATUS_OPTIONS,
   getInvoiceStatusColor,
   getInvoiceStatusLabel,
   getRiskTypeLabel,
   getMaterialTypeLabel,
+  getMaterialStatusLabel,
+  getMaterialStatusColor,
 } from '@/utils/enumOptions'
 import type {
   InvoiceVO,
@@ -50,6 +58,7 @@ import type {
   ApprovalLogVO,
   RiskTypeCode,
   MaterialTypeCode,
+  MaterialStatusCode,
 } from '@/types'
 
 const FormItem = Form.Item
@@ -73,6 +82,7 @@ const InvoiceDetail: React.FC = () => {
   const [materialVisible, setMaterialVisible] = useState(false)
   const [confirmVisible, setConfirmVisible] = useState(false)
   const [resolveSwitch, setResolveSwitch] = useState(true)
+  const [selectedPendingMaterial, setSelectedPendingMaterial] = useState<RiskMaterialVO | null>(null)
 
   const [markRiskForm] = Form.useForm()
   const [materialForm] = Form.useForm()
@@ -103,6 +113,11 @@ const InvoiceDetail: React.FC = () => {
     if (invoiceId) loadAll()
   }, [invoiceId])
 
+  const pendingMaterials = materials.filter((m) => m.materialStatus === 'PENDING')
+  const supplementedMaterials = materials.filter((m) => m.materialStatus === 'SUPPLEMENTED')
+  const hasContractSupplemented = supplementedMaterials.some((m) => m.materialType === 'CONTRACT')
+  const allMaterialsSupplemented = pendingMaterials.length === 0
+
   const handleMarkRisk = async (values: any) => {
     setSubmitting(true)
     try {
@@ -111,6 +126,7 @@ const InvoiceDetail: React.FC = () => {
         riskType: values.riskType,
         riskDescription: values.riskDescription,
         markReason: values.markReason,
+        requiredMaterials: values.requiredMaterials,
       })
       Message.success('风险标记成功')
       setMarkRiskVisible(false)
@@ -121,14 +137,13 @@ const InvoiceDetail: React.FC = () => {
     }
   }
 
-  const hasContract = materials.some((m) => m.materialType === 'CONTRACT')
-
   const handleSupplementMaterial = async (values: any) => {
     setSubmitting(true)
     try {
       await riskApi.supplementMaterial({
         invoiceId,
-        materialType: values.materialType,
+        materialId: selectedPendingMaterial?.id,
+        materialType: selectedPendingMaterial?.materialType || values.materialType,
         materialName: values.materialName,
         materialUrl: values.materialUrl,
         contractNumber: values.contractNumber,
@@ -143,6 +158,7 @@ const InvoiceDetail: React.FC = () => {
       })
       Message.success('材料补充成功')
       setMaterialVisible(false)
+      setSelectedPendingMaterial(null)
       materialForm.resetFields()
       loadAll()
     } finally {
@@ -165,6 +181,30 @@ const InvoiceDetail: React.FC = () => {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handleDeletePendingMaterial = async (materialId: number) => {
+    try {
+      await riskApi.deletePendingMaterial(materialId)
+      Message.success('删除成功')
+      loadAll()
+    } catch (e) {
+      // Error already handled by interceptor
+    }
+  }
+
+  const handleUploadPending = (material: RiskMaterialVO) => {
+    setSelectedPendingMaterial(material)
+    materialForm.setFieldsValue({
+      materialType: material.materialType,
+    })
+    setMaterialVisible(true)
+  }
+
+  const openAddMaterialModal = () => {
+    setSelectedPendingMaterial(null)
+    materialForm.resetFields()
+    setMaterialVisible(true)
   }
 
   const riskColumns = [
@@ -207,6 +247,14 @@ const InvoiceDetail: React.FC = () => {
 
   const materialColumns = [
     {
+      title: '状态',
+      dataIndex: 'materialStatus',
+      width: 100,
+      render: (v: MaterialStatusCode) => (
+        <Tag color={getMaterialStatusColor(v)}>{getMaterialStatusLabel(v)}</Tag>
+      ),
+    },
+    {
       title: '材料类型',
       dataIndex: 'materialType',
       width: 140,
@@ -214,7 +262,7 @@ const InvoiceDetail: React.FC = () => {
         <Tag color="blue">{getMaterialTypeLabel(v)}</Tag>
       ),
     },
-    { title: '材料名称', dataIndex: 'materialName', width: 200 },
+    { title: '材料名称', dataIndex: 'materialName', width: 200, render: (v: string) => v || '-' },
     {
       title: '合同编号',
       dataIndex: 'contractNumber',
@@ -239,17 +287,77 @@ const InvoiceDetail: React.FC = () => {
       width: 120,
       render: (v: string) => (v ? dayjs(v).format('YYYY-MM-DD') : '-'),
     },
-    { title: '备注', dataIndex: 'remark', ellipsis: true },
+    { title: '备注', dataIndex: 'remark', ellipsis: true, render: (v: string) => v || '-' },
     {
       title: '上传人',
       dataIndex: 'uploadedByName',
       width: 120,
+      render: (v: string) => v || '-',
     },
     {
       title: '上传时间',
+      dataIndex: 'uploadedAt',
+      width: 170,
+      render: (v: string) => (v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-'),
+    },
+  ]
+
+  const pendingMaterialColumns = [
+    {
+      title: '材料类型',
+      dataIndex: 'materialType',
+      width: 180,
+      render: (v: MaterialTypeCode) => (
+        <Tag color="blue">{getMaterialTypeLabel(v)}</Tag>
+      ),
+    },
+    {
+      title: '状态',
+      dataIndex: 'materialStatus',
+      width: 100,
+      render: (v: MaterialStatusCode) => (
+        <Tag color={getMaterialStatusColor(v)}>{getMaterialStatusLabel(v)}</Tag>
+      ),
+    },
+    {
+      title: '要求时间',
       dataIndex: 'createdAt',
       width: 170,
       render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm'),
+    },
+    {
+      title: '操作',
+      dataIndex: 'id',
+      width: 180,
+      render: (_: any, record: RiskMaterialVO) => (
+        <Space>
+          {hasRole(['PROCUREMENT_HEAD']) &&
+            (invoice?.status === 'RISK_IDENTIFIED' ||
+              invoice?.status === 'MATERIALS_SUPPLEMENTED') && (
+              <Button
+                type="primary"
+                size="small"
+                icon={<IconUpload />}
+                onClick={() => handleUploadPending(record)}
+              >
+                上传
+              </Button>
+            )}
+          {hasRole(['TAX_SPECIALIST']) && invoice?.conclusionDeletable && (
+            <Popconfirm
+              title="确定删除该待补充材料？"
+              content="删除后将不再要求采购负责人补充该材料"
+              onOk={() => handleDeletePendingMaterial(record.id)}
+              okText="确定"
+              cancelText="取消"
+            >
+              <Button type="primary" size="small" status="danger" icon={<IconDelete />}>
+                删除
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
+      ),
     },
   ]
 
@@ -297,7 +405,7 @@ const InvoiceDetail: React.FC = () => {
                   <Button
                     type="primary"
                     icon={<IconPlus />}
-                    onClick={() => setMaterialVisible(true)}
+                    onClick={openAddMaterialModal}
                   >
                     补充材料
                   </Button>
@@ -436,7 +544,10 @@ const InvoiceDetail: React.FC = () => {
                 />
               </TabPane>
 
-              <TabPane key="materials" title={`补充材料（${materials.length}）`}>
+              <TabPane
+                key="pending"
+                title={`待补充材料（${pendingMaterials.length}）`}
+              >
                 <div
                   style={{
                     display: 'flex',
@@ -445,7 +556,90 @@ const InvoiceDetail: React.FC = () => {
                     marginBottom: 12,
                   }}
                 >
-                  {hasContract ? (
+                  {pendingMaterials.length > 0 ? (
+                    <Tag color="orange">
+                      <IconClose /> 还有 {pendingMaterials.length} 项材料待补充
+                    </Tag>
+                  ) : (
+                    <Tag color="green">
+                      <IconCheck /> 所有要求的材料均已补充
+                    </Tag>
+                  )}
+                  {hasRole(['TAX_SPECIALIST']) &&
+                    (invoice.status === 'RISK_IDENTIFIED' ||
+                      invoice.status === 'MATERIALS_SUPPLEMENTED') &&
+                    invoice.conclusionDeletable && (
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<IconPlus />}
+                        onClick={async () => {
+                          Modal.confirm({
+                            title: '添加待补充材料',
+                            content: (
+                              <Form layout="vertical">
+                                <FormItem label="材料类型" field="materialType">
+                                  <Select placeholder="请选择需要补充的材料类型">
+                                    {MATERIAL_TYPE_OPTIONS.map((opt) => (
+                                      <Option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </Option>
+                                    ))}
+                                  </Select>
+                                </FormItem>
+                              </Form>
+                            ),
+                            onOk: async (values: any) => {
+                              if (!values.materialType) {
+                                Message.warning('请选择材料类型')
+                                return false
+                              }
+                              try {
+                                await riskApi.createPendingMaterial({
+                                  invoiceId,
+                                  materialType: values.materialType,
+                                })
+                                Message.success('添加成功')
+                                loadAll()
+                                return true
+                              } catch {
+                                return false
+                              }
+                            },
+                            okText: '确定',
+                            cancelText: '取消',
+                          })
+                        }}
+                      >
+                        添加待补充项
+                      </Button>
+                    )}
+                </div>
+                {pendingMaterials.length > 0 ? (
+                  <Table
+                    rowKey="id"
+                    columns={pendingMaterialColumns}
+                    data={pendingMaterials}
+                    pagination={false}
+                  />
+                ) : (
+                  <Empty description="暂无待补充材料" />
+                )}
+              </TabPane>
+
+              <TabPane
+                key="materials"
+                title={`已补充材料（${supplementedMaterials.length}）`}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 12,
+                  }}
+                >
+                  {hasContractSupplemented ? (
                     <Tag color="green">
                       <IconCheck /> 已上传采购合同
                     </Tag>
@@ -461,18 +655,22 @@ const InvoiceDetail: React.FC = () => {
                         type="primary"
                         size="small"
                         icon={<IconPlus />}
-                        onClick={() => setMaterialVisible(true)}
+                        onClick={openAddMaterialModal}
                       >
                         补充材料
                       </Button>
                     )}
                 </div>
-                <Table
-                  rowKey="id"
-                  columns={materialColumns}
-                  data={materials}
-                  pagination={false}
-                />
+                {supplementedMaterials.length > 0 ? (
+                  <Table
+                    rowKey="id"
+                    columns={materialColumns}
+                    data={supplementedMaterials}
+                    pagination={false}
+                  />
+                ) : (
+                  <Empty description="暂无已补充材料" />
+                )}
               </TabPane>
 
               <TabPane key="logs" title={`审批日志（${approvalLogs.length}）`}>
@@ -542,6 +740,7 @@ const InvoiceDetail: React.FC = () => {
           markRiskForm.resetFields()
         }}
         confirmLoading={submitting}
+        style={{ width: 600 }}
       >
         <Form
           form={markRiskForm}
@@ -568,15 +767,31 @@ const InvoiceDetail: React.FC = () => {
           <FormItem label="标记原因" field="markReason">
             <Input.TextArea placeholder="请输入标记原因" rows={3} />
           </FormItem>
+          <FormItem
+            label="需要采购补充的材料"
+            field="requiredMaterials"
+            extra="选择后将自动创建待补充材料清单，采购负责人需逐项上传"
+          >
+            <Checkbox.Group>
+              <Space direction="vertical">
+                {MATERIAL_TYPE_OPTIONS.map((opt) => (
+                  <Checkbox key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </Checkbox>
+                ))}
+              </Space>
+            </Checkbox.Group>
+          </FormItem>
         </Form>
       </Modal>
 
       <Modal
-        title="补充材料"
+        title={selectedPendingMaterial ? `上传${getMaterialTypeLabel(selectedPendingMaterial.materialType)}` : '补充材料'}
         visible={materialVisible}
         onOk={() => materialForm.submit()}
         onCancel={() => {
           setMaterialVisible(false)
+          setSelectedPendingMaterial(null)
           materialForm.resetFields()
         }}
         confirmLoading={submitting}
@@ -592,13 +807,11 @@ const InvoiceDetail: React.FC = () => {
             label="材料类型"
             field="materialType"
             rules={[{ required: true, message: '请选择材料类型' }]}
-            extra={
-              !hasContract ? (
-                <span style={{ color: '#f53f3f' }}>建议优先上传「采购合同」</span>
-              ) : null
-            }
           >
-            <Select placeholder="请选择材料类型">
+            <Select
+              placeholder="请选择材料类型"
+              disabled={!!selectedPendingMaterial}
+            >
               {MATERIAL_TYPE_OPTIONS.map((opt) => (
                 <Option key={opt.value} value={opt.value}>
                   {opt.label}
@@ -679,7 +892,25 @@ const InvoiceDetail: React.FC = () => {
             </Space>
           </div>
 
-          {resolveSwitch && !hasContract && (
+          {pendingMaterials.length > 0 && (
+            <div
+              style={{
+                padding: 12,
+                background: '#ffece8',
+                color: '#f53f3f',
+                borderRadius: 4,
+                marginBottom: 12,
+                border: '1px solid #ffcdb9',
+              }}
+            >
+              <IconClose style={{ marginRight: 4 }} />
+              还有 {pendingMaterials.length} 项待补充材料：
+              {pendingMaterials.map((m) => getMaterialTypeLabel(m.materialType)).join('、')}
+              ，请先完成所有材料补充。
+            </div>
+          )}
+
+          {resolveSwitch && !hasContractSupplemented && pendingMaterials.length === 0 && (
             <div
               style={{
                 padding: 12,
@@ -695,7 +926,7 @@ const InvoiceDetail: React.FC = () => {
             </div>
           )}
 
-          {resolveSwitch && (
+          {resolveSwitch && hasContractSupplemented && pendingMaterials.length === 0 && (
             <div style={{ padding: 12, background: '#e8ffea', borderRadius: 4, marginBottom: 12 }}>
               <IconCheck style={{ color: '#00b42a', marginRight: 4 }} />
               选择「解除风险」将把发票状态改为正常，并自动解冻报销。

@@ -1,5 +1,6 @@
 package com.invoice.risk.entity;
 
+import com.invoice.risk.enums.MaterialStatusEnum;
 import com.invoice.risk.enums.MaterialTypeEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -35,6 +36,11 @@ public class RiskMaterial {
     @Enumerated(EnumType.STRING)
     private MaterialTypeEnum materialType;
 
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private MaterialStatusEnum materialStatus = MaterialStatusEnum.PENDING;
+
     @Column(length = 200)
     private String materialName;
 
@@ -54,11 +60,12 @@ public class RiskMaterial {
     @Column(length = 500)
     private String remark;
 
-    @Column(nullable = false)
     private Long uploadedBy;
 
     @Column(length = 50)
     private String uploadedByName;
+
+    private LocalDateTime uploadedAt;
 
     @CreatedDate
     @Column(updatable = false)

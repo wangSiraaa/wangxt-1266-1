@@ -62,4 +62,9 @@ export const httpPost = async <T = any>(url: string, data?: any, config?: Reques
   return response.data.data
 }
 
+export const httpDelete = async <T = any>(url: string, config?: RequestConfig): Promise<T> => {
+  const response = await request.delete<any, AxiosResponse<Result<T>>>(url, config)
+  return response.data.data
+}
+
 export default request

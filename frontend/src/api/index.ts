@@ -42,10 +42,12 @@ export const riskApi = {
     riskType: string
     riskDescription?: string
     markReason?: string
+    requiredMaterials?: string[]
   }) => httpPost<RiskRecordVO>('/risks/mark', data),
 
   supplementMaterial: (data: {
     invoiceId: number
+    materialId?: number
     materialType: string
     materialName?: string
     materialUrl?: string
@@ -55,6 +57,14 @@ export const riskApi = {
     deliveryDate?: string
     remark?: string
   }) => httpPost<RiskMaterialVO>('/risks/materials', data),
+
+  createPendingMaterial: (data: {
+    invoiceId: number
+    materialType: string
+  }) => httpPost<RiskMaterialVO>('/risks/materials/pending', data),
+
+  deletePendingMaterial: (materialId: number) =>
+    httpDelete<void>(`/risks/materials/${materialId}`),
 
   confirmConclusion: (data: {
     invoiceId: number

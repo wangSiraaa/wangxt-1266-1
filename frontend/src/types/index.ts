@@ -106,12 +106,16 @@ export type MaterialTypeCode =
   | 'WAREHOUSE_RECEIPT'
   | 'OTHER'
 
+export type MaterialStatusCode = 'PENDING' | 'SUPPLEMENTED'
+
 export interface RiskMaterialVO {
   id: number
   invoiceId: number
   invoiceCode: string
   materialType: MaterialTypeCode
   materialTypeDescription: string
+  materialStatus: MaterialStatusCode
+  materialStatusDescription: string
   materialName?: string
   materialUrl?: string
   contractNumber?: string
@@ -119,7 +123,8 @@ export interface RiskMaterialVO {
   deliveryNoteNumber?: string
   deliveryDate?: string
   remark?: string
-  uploadedByName: string
+  uploadedByName?: string
+  uploadedAt?: string
   createdAt: string
   updatedAt: string
 }

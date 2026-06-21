@@ -1,5 +1,6 @@
 package com.invoice.risk.dto.risk;
 
+import com.invoice.risk.enums.MaterialStatusEnum;
 import com.invoice.risk.enums.MaterialTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,6 +20,8 @@ public class RiskMaterialVO {
     private String invoiceCode;
     private MaterialTypeEnum materialType;
     private String materialTypeDescription;
+    private MaterialStatusEnum materialStatus;
+    private String materialStatusDescription;
     private String materialName;
     private String materialUrl;
     private String contractNumber;
@@ -27,6 +30,7 @@ public class RiskMaterialVO {
     private LocalDate deliveryDate;
     private String remark;
     private String uploadedByName;
+    private LocalDateTime uploadedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

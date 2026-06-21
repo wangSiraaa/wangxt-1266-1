@@ -1,11 +1,14 @@
 package com.invoice.risk.dto.risk;
 
+import com.invoice.risk.enums.MaterialTypeEnum;
 import com.invoice.risk.enums.RiskTypeEnum;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.List;
 
 @Data
 @Builder
@@ -22,4 +25,6 @@ public class MarkRiskRequest {
     private String riskDescription;
 
     private String markReason;
+
+    private List<MaterialTypeEnum> requiredMaterials;
 }

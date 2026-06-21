@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS risk_material (
     invoice_id BIGINT NOT NULL,
     invoice_code VARCHAR(50),
     material_type VARCHAR(50) NOT NULL,
+    material_status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
     material_name VARCHAR(200),
     material_url VARCHAR(500),
     contract_number VARCHAR(50),
@@ -139,13 +140,15 @@ CREATE TABLE IF NOT EXISTS risk_material (
     delivery_note_number VARCHAR(50),
     delivery_date DATE,
     remark VARCHAR(500),
-    uploaded_by BIGINT NOT NULL,
+    uploaded_by BIGINT,
     uploaded_by_name VARCHAR(50),
+    uploaded_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_material_invoice ON risk_material(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_material_status ON risk_material(material_status);
 
 -- =============================================
 -- 7. 审批日志表

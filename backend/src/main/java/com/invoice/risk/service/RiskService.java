@@ -70,10 +70,35 @@ public class RiskService {
         }
         invoiceService.saveInvoice(invoice);
 
+        if (request.getRequiredMaterials() != null && !request.getRequiredMaterials().isEmpty()) {
+            for (MaterialTypeEnum materialType : request.getRequiredMaterials()) {
+                boolean exists = riskMaterialRepository.existsByInvoiceIdAndMaterialTypeAndMaterialStatus(
+                        invoice.getId(), materialType, MaterialStatusEnum.PENDING);
+                if (!exists) {
+                    RiskMaterial pendingMaterial = RiskMaterial.builder()
+                            .invoiceId(invoice.getId())
+                            .invoiceCode(invoice.getInvoiceCode())
+                            .materialType(materialType)
+                            .materialStatus(MaterialStatusEnum.PENDING)
+                            .build();
+                    riskMaterialRepository.save(pendingMaterial);
+                }
+            }
+        }
+
+        String materialDesc = "";
+        if (request.getRequiredMaterials() != null && !request.getRequiredMaterials().isEmpty()) {
+            materialDesc = String.format("，要求补充材料：%s",
+                    request.getRequiredMaterials().stream()
+                            .map(MaterialTypeEnum::getDescription)
+                            .collect(java.util.stream.Collectors.joining("、")));
+        }
+
         saveApprovalLog(invoice, ApprovalActionEnum.MARK_RISK,
-                String.format("标记风险类型：%s，原因：%s",
+                String.format("标记风险类型：%s，原因：%s%s",
                         request.getRiskType().getDescription(),
-                        request.getMarkReason() != null ? request.getMarkReason() : "无"),
+                        request.getMarkReason() != null ? request.getMarkReason() : "无",
+                        materialDesc),
                 currentUser);
 
         return toRiskRecordVO(saved);
@@ -93,24 +118,45 @@ public class RiskService {
             throw new BusinessException("当前发票状态不允许补充材料");
         }
 
-        RiskMaterial material = RiskMaterial.builder()
-                .invoiceId(invoice.getId())
-                .invoiceCode(invoice.getInvoiceCode())
-                .materialType(request.getMaterialType())
-                .materialName(request.getMaterialName())
-                .materialUrl(request.getMaterialUrl())
-                .contractNumber(request.getContractNumber())
-                .contractDate(request.getContractDate())
-                .deliveryNoteNumber(request.getDeliveryNoteNumber())
-                .deliveryDate(request.getDeliveryDate())
-                .remark(request.getRemark())
-                .uploadedBy(currentUser.getId())
-                .uploadedByName(currentUser.getRealName())
-                .build();
+        RiskMaterial material;
+        if (request.getMaterialId() != null) {
+            material = riskMaterialRepository.findById(request.getMaterialId())
+                    .orElseThrow(() -> new BusinessException("材料记录不存在"));
+            if (material.getMaterialStatus() == MaterialStatusEnum.SUPPLEMENTED) {
+                throw new BusinessException("该材料已补充，请勿重复上传");
+            }
+            material.setMaterialType(request.getMaterialType());
+            material.setMaterialStatus(MaterialStatusEnum.SUPPLEMENTED);
+        } else {
+            material = RiskMaterial.builder()
+                    .invoiceId(invoice.getId())
+                    .invoiceCode(invoice.getInvoiceCode())
+                    .materialType(request.getMaterialType())
+                    .materialStatus(MaterialStatusEnum.SUPPLEMENTED)
+                    .build();
+        }
+
+        material.setMaterialName(request.getMaterialName());
+        material.setMaterialUrl(request.getMaterialUrl());
+        material.setContractNumber(request.getContractNumber());
+        material.setContractDate(request.getContractDate());
+        material.setDeliveryNoteNumber(request.getDeliveryNoteNumber());
+        material.setDeliveryDate(request.getDeliveryDate());
+        material.setRemark(request.getRemark());
+        material.setUploadedBy(currentUser.getId());
+        material.setUploadedByName(currentUser.getRealName());
+        material.setUploadedAt(LocalDateTime.now());
+
         RiskMaterial saved = riskMaterialRepository.save(material);
 
-        invoice.setStatus(InvoiceStatusEnum.MATERIALS_SUPPLEMENTED);
-        invoiceService.saveInvoice(invoice);
+        boolean allSupplemented = riskMaterialRepository
+                .findByInvoiceIdAndMaterialStatus(invoice.getId(), MaterialStatusEnum.PENDING)
+                .isEmpty();
+
+        if (allSupplemented) {
+            invoice.setStatus(InvoiceStatusEnum.MATERIALS_SUPPLEMENTED);
+            invoiceService.saveInvoice(invoice);
+        }
 
         saveApprovalLog(invoice, ApprovalActionEnum.SUPPLEMENT_MATERIALS,
                 String.format("补充材料类型：%s，名称：%s",
@@ -119,6 +165,62 @@ public class RiskService {
                 currentUser);
 
         return toRiskMaterialVO(saved);
+    }
+
+    @Transactional
+    public RiskMaterialVO createPendingMaterial(SupplementMaterialRequest request) {
+        SysUser currentUser = UserContext.getUser();
+        if (currentUser.getRole() != RoleEnum.TAX_SPECIALIST) {
+            throw new BusinessException("只有税务专员可以添加待补充材料");
+        }
+
+        Invoice invoice = invoiceService.getInvoiceEntityById(request.getInvoiceId());
+
+        boolean exists = riskMaterialRepository.existsByInvoiceIdAndMaterialTypeAndMaterialStatus(
+                invoice.getId(), request.getMaterialType(), MaterialStatusEnum.PENDING);
+        if (exists) {
+            throw new BusinessException("该类型材料已在待补充清单中");
+        }
+
+        RiskMaterial material = RiskMaterial.builder()
+                .invoiceId(invoice.getId())
+                .invoiceCode(invoice.getInvoiceCode())
+                .materialType(request.getMaterialType())
+                .materialStatus(MaterialStatusEnum.PENDING)
+                .build();
+        RiskMaterial saved = riskMaterialRepository.save(material);
+
+        saveApprovalLog(invoice, ApprovalActionEnum.MARK_RISK,
+                String.format("新增待补充材料：%s", request.getMaterialType().getDescription()),
+                currentUser);
+
+        return toRiskMaterialVO(saved);
+    }
+
+    @Transactional
+    public void deletePendingMaterial(Long materialId) {
+        SysUser currentUser = UserContext.getUser();
+        if (currentUser.getRole() != RoleEnum.TAX_SPECIALIST) {
+            throw new BusinessException("只有税务专员可以删除待补充材料");
+        }
+
+        RiskMaterial material = riskMaterialRepository.findById(materialId)
+                .orElseThrow(() -> new BusinessException("材料记录不存在"));
+
+        if (material.getMaterialStatus() == MaterialStatusEnum.SUPPLEMENTED) {
+            throw new BusinessException("已补充的材料不能删除");
+        }
+
+        Invoice invoice = invoiceService.getInvoiceEntityById(material.getInvoiceId());
+        if (!invoice.getConclusionDeletable()) {
+            throw new BusinessException("该发票已形成不可删除的处理结论，无法删除材料");
+        }
+
+        riskMaterialRepository.delete(material);
+
+        saveApprovalLog(invoice, ApprovalActionEnum.MARK_RISK,
+                String.format("删除待补充材料：%s", material.getMaterialType().getDescription()),
+                currentUser);
     }
 
     @Transactional
@@ -137,11 +239,21 @@ public class RiskService {
             throw new BusinessException("当前发票状态不允许确认结论");
         }
 
-        boolean hasContract = riskMaterialRepository.existsByInvoiceIdAndMaterialType(
-                invoice.getId(), MaterialTypeEnum.CONTRACT);
+        boolean hasContract = riskMaterialRepository.existsByInvoiceIdAndMaterialTypeAndMaterialStatus(
+                invoice.getId(), MaterialTypeEnum.CONTRACT, MaterialStatusEnum.SUPPLEMENTED);
 
         if (request.getResolved() && !hasContract) {
-            throw new BusinessException("缺少采购合同，不能解除风险");
+            throw new BusinessException("缺少已上传的采购合同，不能解除风险");
+        }
+
+        List<RiskMaterial> pendingMaterials = riskMaterialRepository
+                .findByInvoiceIdAndMaterialStatus(invoice.getId(), MaterialStatusEnum.PENDING);
+
+        if (request.getResolved() && !pendingMaterials.isEmpty()) {
+            String pendingNames = pendingMaterials.stream()
+                    .map(m -> m.getMaterialType().getDescription())
+                    .collect(java.util.stream.Collectors.joining("、"));
+            throw new BusinessException("还有待补充的材料未上传：" + pendingNames + "，请先完成所有材料补充");
         }
 
         if (request.getResolved()) {
@@ -234,6 +346,8 @@ public class RiskService {
                 .invoiceCode(m.getInvoiceCode())
                 .materialType(m.getMaterialType())
                 .materialTypeDescription(m.getMaterialType().getDescription())
+                .materialStatus(m.getMaterialStatus())
+                .materialStatusDescription(m.getMaterialStatus().getDescription())
                 .materialName(m.getMaterialName())
                 .materialUrl(m.getMaterialUrl())
                 .contractNumber(m.getContractNumber())
@@ -242,6 +356,7 @@ public class RiskService {
                 .deliveryDate(m.getDeliveryDate())
                 .remark(m.getRemark())
                 .uploadedByName(m.getUploadedByName())
+                .uploadedAt(m.getUploadedAt())
                 .createdAt(m.getCreatedAt())
                 .updatedAt(m.getUpdatedAt())
                 .build();

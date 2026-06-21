@@ -1,4 +1,4 @@
-import type { InvoiceStatusCode, RiskTypeCode, MaterialTypeCode, RoleCode, ApprovalActionCode } from '@/types'
+import type { InvoiceStatusCode, RiskTypeCode, MaterialTypeCode, MaterialStatusCode, RoleCode, ApprovalActionCode } from '@/types'
 
 export const INVOICE_STATUS_OPTIONS: { label: string; value: InvoiceStatusCode; color?: string }[] = [
   { label: '正常', value: 'NORMAL', color: 'green' },
@@ -64,8 +64,19 @@ export const getInvoiceStatusColor = (code: InvoiceStatusCode) =>
 export const getRiskTypeLabel = (code: RiskTypeCode) =>
   RISK_TYPE_OPTIONS.find((i) => i.value === code)?.label || code
 
+export const MATERIAL_STATUS_OPTIONS: { label: string; value: MaterialStatusCode; color?: string }[] = [
+  { label: '待补充', value: 'PENDING', color: 'orange' },
+  { label: '已补充', value: 'SUPPLEMENTED', color: 'green' },
+]
+
 export const getMaterialTypeLabel = (code: MaterialTypeCode) =>
   MATERIAL_TYPE_OPTIONS.find((i) => i.value === code)?.label || code
+
+export const getMaterialStatusLabel = (code: MaterialStatusCode) =>
+  MATERIAL_STATUS_OPTIONS.find((i) => i.value === code)?.label || code
+
+export const getMaterialStatusColor = (code: MaterialStatusCode) =>
+  MATERIAL_STATUS_OPTIONS.find((i) => i.value === code)?.color || 'grey'
 
 export const getRoleLabel = (code: RoleCode) =>
   ROLE_OPTIONS.find((i) => i.value === code)?.label || code

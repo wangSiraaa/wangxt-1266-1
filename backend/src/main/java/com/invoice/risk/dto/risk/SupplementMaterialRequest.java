@@ -18,6 +18,8 @@ public class SupplementMaterialRequest {
     @NotNull(message = "发票ID不能为空")
     private Long invoiceId;
 
+    private Long materialId;
+
     @NotNull(message = "材料类型不能为空")
     private MaterialTypeEnum materialType;
 
